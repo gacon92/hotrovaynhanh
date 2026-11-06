@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công cụ xem thông tin ảnh (EXIF)</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+            transition: max-width 0.3s ease;
+        }
+        .container.has-data {
+            max-width: 700px;
+        }
+        .upload-link {
+            display: inline-flex;
+            align-items: center;
+            color: #007aff;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 10px 20px;
+            border: 1px dashed #007aff;
+            border-radius: 8px;
+            background: #f0f7ff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .upload-link:hover {
+            background: #007aff;
+            color: #fff;
+        }
+        #imageInput {
+            display: none;
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+            text-align: left;
+            font-size: 14px;
+            animation: fadeIn 0.4s ease;
+        }
+        .result-table th, .result-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .result-table th {
+            background-color: #f8f9fa;
+            color: #555;
+            font-weight: 600;
+            width: 35%;
+        }
+        .result-table tr:hover {
+            background-color: #fcfcfc;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="mainContainer">
+        <!-- Đường link kích hoạt chọn ảnh -->
+        <a href="#" class="upload-link" id="uploadTrigger">📸 Chọn ảnh để xem thông số EXIF</a>
+        <input type="file" id="imageInput" accept="image/*">
+        
+        <!-- Trạng thái loading hoặc thông báo lỗi -->
+        <div id="status" class="status" style="display: none;"></div>
+
+        <!-- Bảng hiển thị kết quả gọn gàng -->
+        <table class="result-table" id="resultTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Thông số</th>
+                    <th>Chi tiết</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const uploadTrigger = document.getElementById("uploadTrigger");
+        const imageInput = document.getElementById("imageInput");
+        const mainContainer = document.getElementById("mainContainer");
+        const statusDiv = document.getElementById("status");
+        const resultTable = document.getElementById("resultTable");
+        const resultBody = document.getElementById("resultBody");
+
+        // Click vào link để mở hộp thoại chọn file
+        uploadTrigger.addEventListener("click", function(e) {
+            e.preventDefault();
+            imageInput.click();
+        });
+
+        // Xử lý khi người dùng chọn file xong
+        imageInput.addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Ẩn bảng cũ và hiện trạng thái đang xử lý
+            resultTable.style.display = "none";
+            statusDiv.style.display = "block";
+            statusDiv.textContent = "⏳ Đang phân tích dữ liệu ảnh...";
+            resultBody.innerHTML = "";
+
+            EXIF.getData(file, function() {
+                const tags = EXIF.getAllTags(this);
+                
+                if (Object.keys(tags).length === 0) {
+                    statusDiv.textContent = "❌ Không tìm thấy dữ liệu EXIF trong ảnh này.";
+                    mainContainer.classList.remove("has-data");
+                    return;
+                }
+
+                // Ẩn thông báo trạng thái, mở rộng khung và hiện bảng dữ liệu
+                statusDiv.style.display = "none";
+                mainContainer.classList.add("has-data");
+                resultTable.style.display = "table";
+
+                // Duyệt qua dữ liệu và chèn vào bảng (Bỏ qua dữ liệu nhị phân quá dài nếu có)
+                for (let tag in tags) {
+                    if (tags.hasOwnProperty(tag) && typeof tags[tag] !== 'object' && String(tags[tag]).length < 200) {
+                        const row = `<tr>
+                            <td><strong>${tag}</strong></td>
+                            <td>${tags[tag]}</td>
+                        </tr>`;
+                        resultBody.insertAdjacentHTML('beforeend', row);
+                    }
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
