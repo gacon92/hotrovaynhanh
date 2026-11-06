@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Công cụ xem thông tin ảnh (EXIF)</title>
+    <!-- Sử dụng thư viện Exif-js -->
     <script src="https://jsdelivr.net"></script>
     <style>
         body {
@@ -55,6 +56,7 @@
             margin-top: 15px;
             font-size: 14px;
             color: #666;
+            font-weight: 500;
         }
         .result-table {
             width: 100%;
@@ -86,14 +88,11 @@
 <body>
 
     <div class="container" id="mainContainer">
-        <!-- Đường link kích hoạt chọn ảnh -->
         <a href="#" class="upload-link" id="uploadTrigger">📸 Chọn ảnh để xem thông số EXIF</a>
         <input type="file" id="imageInput" accept="image/*">
         
-        <!-- Trạng thái loading hoặc thông báo lỗi -->
         <div id="status" class="status" style="display: none;"></div>
 
-        <!-- Bảng hiển thị kết quả gọn gàng -->
         <table class="result-table" id="resultTable" style="display: none;">
             <thead>
                 <tr>
@@ -113,46 +112,69 @@
         const resultTable = document.getElementById("resultTable");
         const resultBody = document.getElementById("resultBody");
 
-        // Click vào link để mở hộp thoại chọn file
         uploadTrigger.addEventListener("click", function(e) {
             e.preventDefault();
             imageInput.click();
         });
 
-        // Xử lý khi người dùng chọn file xong
         imageInput.addEventListener("change", function(event) {
-            const file = event.target.files[0];
+            // Sửa lỗi: Lấy chính xác file đầu tiên trong danh sách file được chọn
+            const file = event.target.files[0]; 
             if (!file) return;
 
-            // Ẩn bảng cũ và hiện trạng thái đang xử lý
+            // Reset trạng thái giao diện
             resultTable.style.display = "none";
             statusDiv.style.display = "block";
+            statusDiv.style.color = "#666";
             statusDiv.textContent = "⏳ Đang phân tích dữ liệu ảnh...";
             resultBody.innerHTML = "";
+            mainContainer.classList.remove("has-data");
 
+            // Kiểm tra xem thư viện EXIF đã tải thành công chưa
+            if (typeof EXIF === "undefined") {
+                statusDiv.style.color = "red";
+                statusDiv.textContent = "❌ Lỗi kết nối mạng, không thể tải thư viện xử lý ảnh.";
+                return;
+            }
+
+            // Tiến hành đọc dữ liệu EXIF từ file đơn lẻ
             EXIF.getData(file, function() {
                 const tags = EXIF.getAllTags(this);
                 
-                if (Object.keys(tags).length === 0) {
-                    statusDiv.textContent = "❌ Không tìm thấy dữ liệu EXIF trong ảnh này.";
-                    mainContainer.classList.remove("has-data");
+                if (!tags || Object.keys(tags).length === 0) {
+                    statusDiv.style.color = "orange";
+                    statusDiv.textContent = "ℹ️ Không tìm thấy hoặc ảnh đã bị xóa dữ liệu EXIF.";
                     return;
                 }
 
-                // Ẩn thông báo trạng thái, mở rộng khung và hiện bảng dữ liệu
+                // Ẩn thông báo tải, hiển thị bảng kết quả
                 statusDiv.style.display = "none";
                 mainContainer.classList.add("has-data");
                 resultTable.style.display = "table";
 
-                // Duyệt qua dữ liệu và chèn vào bảng (Bỏ qua dữ liệu nhị phân quá dài nếu có)
+                // Đổ dữ liệu vào bảng một cách an toàn
+                let hasValidContent = false;
                 for (let tag in tags) {
-                    if (tags.hasOwnProperty(tag) && typeof tags[tag] !== 'object' && String(tags[tag]).length < 200) {
-                        const row = `<tr>
-                            <td><strong>${tag}</strong></td>
-                            <td>${tags[tag]}</td>
-                        </tr>`;
-                        resultBody.insertAdjacentHTML('beforeend', row);
+                    if (tags.hasOwnProperty(tag)) {
+                        const val = tags[tag];
+                        // Bỏ qua các trường dữ liệu nhị phân (Binary) hoặc quá dài làm chậm trình duyệt
+                        if (typeof val !== 'object' && String(val).trim() !== "" && String(val).length < 150) {
+                            hasValidContent = true;
+                            const row = `<tr>
+                                <td><strong>${tag}</strong></td>
+                                <td>${val}</td>
+                            </tr>`;
+                            resultBody.insertAdjacentHTML('beforeend', row);
+                        }
                     }
+                }
+
+                if (!hasValidContent) {
+                    statusDiv.style.display = "block";
+                    statusDiv.style.color = "orange";
+                    statusDiv.textContent = "ℹ️ Dữ liệu ảnh không chứa thông số đọc được.";
+                    resultTable.style.display = "none";
+                    mainContainer.classList.remove("has-data");
                 }
             });
         });
